@@ -27,7 +27,7 @@ def monitor_table(request):
     latest_data = None
     try:
         connection = pymysql.connect(
-            host='localhost', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
+            host='rain_db', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
         cursor = connection.cursor(pymysql.cursors.DictCursor)
         # SQL 查询该时间点的所有降雨数据
         sql = """
@@ -197,7 +197,7 @@ def valve_table(request):
     result = {'status':'success', 'msg':'', 'data':[]}
     latest_data = None
     try:
-        connection = pymysql.connect(host='localhost', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
+        connection = pymysql.connect(host='rain_db', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
         cursor = connection.cursor(pymysql.cursors.DictCursor)
         sql = """SELECT * FROM `valve_table`
          ORDER BY `valve_close_time` DESC """
@@ -275,7 +275,7 @@ def monitor_sheet_insert(request):
 	sheet_data['current_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 	try:
 		connection = pymysql.connect(
-			host='localhost', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
+			host='rain_db', port=3306, user='root', password='1qaz2wsx', database='water_monitor', charset='utf8mb4')
 		cursor = connection.cursor(pymysql.cursors.DictCursor)
 		# create SQL statement
 		
