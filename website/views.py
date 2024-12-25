@@ -375,43 +375,6 @@ def delete_valve_record(request):
     return JsonResponse(result)
 
 
-# 變更line group
-@csrf_protect
-def notify_line(request):
-    file_path = os.path.join(settings.BASE_DIR, 'static/media', 'APIkey.txt')
-    # Read the stations from the file
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            content = file.read()
-           
-    context = {'APIkey': content}
-    
-    response = render(request, 'notify_line.html', context)
-    response['Strict-Transport-Security'] = 'max-age=2592000'
-    response['X-Frame-Options'] = 'SAMEORIGIN'
-    response['Referrer-Policy'] = 'no-referrer'
-    response['X-XSS-Protection'] = '1; mode=block'
-    response['X-Content-Type-Options'] = 'nosniff'
-    response['Strict-Transport-Security'] = 'max-age=16070400; includeSubDomains'
-    return response
-
-
-#儲存apikey
-@csrf_exempt
-def save_line_api(request):
-    if request.method == 'POST':
-        apikey = request.POST.get('new_APIkey')
-
-        # 使用相对路径保存文件，路径相对于 Django 项目的根目录
-        file_dir = os.path.join(settings.BASE_DIR, 'static/media')
-        file_name = 'APIkey.txt'
-        file_path = os.path.join(file_dir, file_name)
-
-        # 将内容写入文件
-        with open(file_path, 'w') as file:
-            file.write(apikey)
-        # 返回一个简单的响应确认保存成功
-        return HttpResponse(f"File saved successfully at: {file_path}")
 
 
 	
