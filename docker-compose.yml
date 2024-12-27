@@ -1,0 +1,85 @@
+services:
+  streamlit:
+    build:
+      context: ./streamlit
+      dockerfile: Dockerfile
+    container_name: streamlit_service
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./streamlit:/app
+      - ./chains:/app/chains
+      - ./db:/app/db
+      - ./pdf:/app/pdf
+      - ./.env:/app/.env  # 挂载.env文件到容器中
+    env_file:
+      - ./.env
+    depends_on:
+      - mysql
+
+  langserve:
+    build:
+      context: ./langserve
+      dockerfile: Dockerfile
+    container_name: langserve_service
+    ports:
+      - "8052:8052"
+    volumes:
+      - ./langserve:/app
+      - ./chains:/app/chains
+      - ./db:/app/db
+      - ./pdf:/app/pdf
+      - ./.env:/app/.env  # 挂载.env文件到容器中
+    env_file:
+      - ./.env
+    depends_on:
+      - mysql
+  
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_service
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro  # 初始化SQL脚本
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  
+  django:
+    build:
+      context: ./django  # Django 项目路径
+      dockerfile: Dockerfile
+    container_name: django_service
+    ports:
+      - "8006:8006"  # Django 默认运行在 8000 端口
+    volumes:
+      - ./django:/app  # 挂载 Django 项目到容器中
+      - django_static:/app/static  # 持久化并共享 static 文件夹
+    depends_on:
+      - mysql
+
+  scrawling:
+    build:
+      context: ./scrawling # Scrawling 服务路径
+      dockerfile: Dockerfile
+    container_name: scrawling_service
+    volumes:
+      - ./scrawling:/app  # 挂载 Scrawling 项目到容器中
+      - django_static:/app/static  # 共享 Django 的 static 文件夹
+    env_file:
+      - ./.env
+    depends_on:
+      - django
+volumes:
+  mysql_data:
+  django_static:
