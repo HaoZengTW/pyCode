@@ -4,6 +4,7 @@ services:
       context: ./streamlit
       dockerfile: Dockerfile
     container_name: streamlit_service
+    restart: always
     ports:
       - "8501:8501"
     volumes:
@@ -22,6 +23,7 @@ services:
       context: ./langserve
       dockerfile: Dockerfile
     container_name: langserve_service
+    restart: always
     ports:
       - "8052:8052"
     volumes:
@@ -60,6 +62,7 @@ services:
       context: ./django  # Django 项目路径
       dockerfile: Dockerfile
     container_name: django_service
+    restart: always
     ports:
       - "8006:8006"  # Django 默认运行在 8000 端口
     volumes:
@@ -73,6 +76,7 @@ services:
       context: ./scrawling # Scrawling 服务路径
       dockerfile: Dockerfile
     container_name: scrawling_service
+    restart: always
     volumes:
       - ./scrawling:/app  # 挂载 Scrawling 项目到容器中
       - django_static:/app/static  # 共享 Django 的 static 文件夹

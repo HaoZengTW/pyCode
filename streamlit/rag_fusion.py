@@ -43,9 +43,41 @@ def filtered_retiever(question):
 
 
 st.title('上水ＧＰＴ')
+# Initialize session state for button visibility
+if 'button_one_clicked' not in st.session_state:
+    st.session_state['button_one_clicked'] = False
+if 'sop_m' not in st.session_state:
+    st.session_state['sop_m'] = ""
+if 'button_two_clicked' not in st.session_state:
+    st.session_state['button_two_clicked'] = False
+if 'smp_m' not in st.session_state:
+    st.session_state['smp_m'] = ""
+if 'text_content' not in st.session_state:
+    st.session_state['text_content'] = ""
+    
+# Add two buttons with mutual control
+st.text("常見問題：")
+if st.button('設備異常'):
+    st.session_state['button_one_clicked'] = not st.session_state['button_one_clicked']
+    st.session_state['button_two_clicked'] = False
+    st.session_state['text_content'] = f"請問設備『{st.session_state['smp_m']}』的操作流程"
+if st.button('操作流程'):
+    st.session_state['button_two_clicked'] = not st.session_state['button_two_clicked']
+    st.session_state['button_one_clicked'] = False
+    st.session_state['text_content'] = f"設備『{st.session_state['sop_m']}』發生故障，請問該如何排除"
 
+if st.session_state['button_two_clicked']:
+    smp_options = ["電動進流閘門", "攔污柵", "曝氣沉砂池洗砂機","二級沉澱池","砂濾設備","回收水自動加壓系統","紫外線消毒設備","帶濾式脫水機","污泥乾燥系統"]
+    selected_smp = st.selectbox("請選擇設備：", smp_options)
+    st.session_state['smp_m'] = selected_smp
+    st.session_state['text_content'] = f"請問設備『{st.session_state['smp_m']}』的操作流程"
+if st.session_state['button_one_clicked']:
+    sop_options = ["閘門類", "沉水式抽水泵", "沉水式攪拌機","電動攔污柵","洗砂機","空氣壓縮機","乾井式豎軸離心泵","刮泥機","魯式鼓風機","泡藥設備","污泥脫水機","電動吊車","螺旋泵"]
+    selected_sop = st.selectbox("請選擇設備：", sop_options)
+    st.session_state['sop_m'] = selected_sop
+    st.session_state['text_content'] = f"設備『{st.session_state['sop_m']}』發生故障，請問該如何排除"
 with st.form('my_form'):
-    text = st.text_area('Enter text:', '')
+    text = st.text_area('Enter text:', st.session_state['text_content'])
     submitted = st.form_submit_button('Submit')
     if submitted:
         if len(text.strip())>0:
