@@ -6,6 +6,23 @@ import pymysql
 import requests
 import smtplib
 from email.mime.text import MIMEText
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+NUM7_SERVER = os.getenv('NUM7_SERVER')
+RESET_URL = f"{NUM7_SERVER}/reset_timer"
+FAIL_URL = f"{NUM7_SERVER}/notification_fail"
+
+def post_req(url):
+    try:
+        response = requests.post(url)
+        if response.status_code == 200:
+            print("Timer reset successfully.")
+        else:
+            print(f"Failed to reset timer. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
 
 
 # =========================
@@ -234,7 +251,7 @@ def fetch_and_store_data():
             line_notify_if_needed(stations_to_check, df, connection)
             insert_data_to_db(df, connection)
             connection.commit()
-
+        post_req(RESET_URL)
     except Exception as e:
         print(f"錯誤: {e}")
     finally:
