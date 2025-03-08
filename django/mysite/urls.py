@@ -13,8 +13,6 @@ urlpatterns = [
     path('monitor_table/', monitor_table),
     path('select_station/', select_station),
     path('save_selected_stations/', save_selected_stations),
-    path('notify_condition/', notify_condition),
-    path('save_rainfall_condition/', save_rainfall_condition),
     path('valve_table/', valve_table),
     path('delete_valve_record/', delete_valve_record),
 

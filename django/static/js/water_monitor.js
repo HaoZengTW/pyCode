@@ -1,112 +1,105 @@
 
+// ✅ 全域變數，確保 existingStations 可被所有函式使用
+var existingStations = [];
+
+window.onload = function() {
+    var stationList = document.getElementById('stationList').children;
+    for (var i = 0; i < stationList.length; i++) {
+        existingStations.push({
+            "station_id": stationList[i].getAttribute('data-station-id'),
+            "station_name": stationList[i].getAttribute('data-station') || "未知測站",
+            "rainfall_num": stationList[i].getAttribute('data-rainfall') || "0"
+        });
+    }
+    console.log("已載入的 existingStations:", existingStations);  // ✅ 確保 `existingStations` 正確初始化
+};
+
 function addStation() {
-    var stationSelect = document.getElementById('stationSelect');
-    var stationName = stationSelect.value;
+    var selectElement = document.getElementById('stationSelect');
+    var selectedOption = selectElement.options[selectElement.selectedIndex];
+    var rainfallAmount = document.getElementById('rainfallAmount').value;
 
-    // 創建一個新的測站項目
-    var stationItem = document.createElement('div');
-    stationItem.className = 'selected-station';
-    stationItem.setAttribute('data-station', stationName);
+    if (!rainfallAmount) {
+        alert("請輸入降雨量");
+        return;
+    }
 
-    var stationText = document.createElement('span');
-    stationText.textContent = stationName;
+    var stationId = selectedOption.value;
+    var stationName = selectedOption.getAttribute('data-station-name');
 
-    var removeButton = document.createElement('button');
-    removeButton.className = 'btn btn-danger btn-sm';
-    removeButton.textContent = '移除';
-    removeButton.setAttribute('type', 'button');
-    removeButton.setAttribute('onclick', 'removeStation(this)');
+    if (!stationId || stationId === "UNKNOWN_ID") {
+        alert("錯誤：測站 ID 無效！");
+        return;
+    }
 
-    stationItem.appendChild(stationText);
-    stationItem.appendChild(removeButton);
-
-    // 將新項目添加到列表中
     var stationList = document.getElementById('stationList');
-    stationList.appendChild(stationItem);
+
+    // 檢查是否已經存在於 existingStations（資料庫測站）
+    if (existingStations.some(s => s.station_id === stationId)) {
+        alert("該測站已經在資料庫中！");
+        return;
+    }
+
+    // 檢查是否已經存在於前端 stationList
+    var displayedStations = stationList.getElementsByClassName('selected-station');
+    for (var i = 0; i < displayedStations.length; i++) {
+        if (displayedStations[i].getAttribute('data-station-id') === stationId) {
+            alert("該測站已經添加！");
+            return;
+        }
+    }
+
+    var newStation = document.createElement('div');
+    newStation.classList.add('selected-station');
+    newStation.setAttribute('data-station-id', stationId);
+    newStation.setAttribute('data-station', stationName);
+    newStation.setAttribute('data-rainfall', rainfallAmount);
+    newStation.innerHTML = `
+        <span>${stationName} - 降雨量: ${rainfallAmount} mm</span>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeStation(this)">移除</button>
+    `;
+
+    stationList.appendChild(newStation);
 }
 
 function removeStation(button) {
-    // 移除測站項目
     var stationItem = button.parentElement;
     stationItem.remove();
 }
 
 
 function submitStations() {
-    // 获取当前选择的测站列表
     var stationList = document.getElementById('stationList').children;
     var selectedStations = [];
+
+    // ✅ 讀取所有前端選擇的測站，準備傳送到後端
     for (var i = 0; i < stationList.length; i++) {
-        selectedStations.push(stationList[i].getAttribute('data-station'));
+        var stationId = stationList[i].getAttribute('data-station-id');
+        var stationName = stationList[i].getAttribute('data-station');
+        var rainfallNum = stationList[i].getAttribute('data-rainfall');
+
+        selectedStations.push({
+            "station_id": stationId,
+            "station_name": stationName || "未知測站",
+            "rainfall_num": rainfallNum || "0"
+        });
     }
-    // 将选择的测站列表转为字符串
-    var stationsString = JSON.stringify(selectedStations);
-    // 提交数据到服务器
+
+    // ✅ 發送 AJAX 請求存入資料庫（會先清空，再插入新資料）
     $.ajax({
-        url: '/save_selected_stations/',  // 替换为处理请求的 Django 视图 URL
+        url: '/save_selected_stations/',
         type: 'POST',
-        data: {
-            'selected_stations': stationsString,
-            'csrfmiddlewaretoken': $('meta[name="csrf-token"]').attr('content')
+        contentType: 'application/json',
+        data: JSON.stringify({'selected_stations': selectedStations}),
+        headers: {
+            'X-CSRFToken': $('meta[name="csrf-token"]').attr('content')
         },
-        xhrFields: {
-            responseType: 'blob'  // 将响应类型设置为 Blob，以便处理文件下载
+        success: function (response) {
+            alert(response.message);
+            location.reload();  // ✅ 成功後刷新頁面，顯示最新數據
         },
-        success: function (data, status, xhr) {
-            alert("已提交選擇的測站");
-
-            // 从响应中获取文件名
-            var filename = xhr.getResponseHeader('Content-Disposition').split('filename=')[1];
-            var blob = new Blob([data], { type: 'text/plain' });
-            var link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        },
-    });
-}
-
-
-function submitCondition() {
-    var condition = document.getElementById('rainfallAmount').value;
-    if (!isFloat(condition)) {
-        alert('請輸入浮點數格式的降雨條件。');
-        return;
-    }
-    // 禁用提交按钮，防止多次提交
-    var submitButton = document.getElementById('submitBtn');
-    // submitButton.disabled = true;
-    $.ajax({
-        url: '/save_rainfall_condition/',
-        type: 'POST',
-        data: {
-            'rainfall_condition': condition,
-        },
-        success: function (data) {
-            alert("已更新降雨條件");
-            submitButton.disabled = false; // 提交成功后重新启用按钮
-        }
-    });
-}
-
-//提交群組金鑰
-function submitAPIkey() {
-    var APIkey = document.getElementById('APIkey').value;
-    
-    // 禁用提交按钮，防止多次提交
-    var submitButton = document.getElementById('submitBtn');
-    // submitButton.disabled = true;
-    $.ajax({
-        url: '/save_line_api/',
-        type: 'POST',
-        data: {
-            'new_APIkey': APIkey,
-        },
-        success: function (data) {
-            alert("已更新通知群組");
-            submitButton.disabled = false; // 提交成功后重新启用按钮
+        error: function () {
+            alert("儲存失敗，請重試！");
         }
     });
 }
@@ -153,7 +146,6 @@ function monitor_sheet_insert() {
     });
 }
 
-// 10/23 upgrade 
 // delete record
 function deleteRecord(id) {
     if (confirm('確定要刪除此筆資料嗎？')) {

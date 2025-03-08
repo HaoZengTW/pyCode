@@ -16,7 +16,8 @@ from django.conf import settings
 from datetime import datetime, timedelta
 import json
 
-# cd /Users/dengpeiyu/Desktop/上水汙水處理/rainfall_dect
+# cd /Users/dengpeiyu/Desktop/上水汙水處理/rainfall_detect
+# python manage.py migrate
 # python manage.py runserver
 # git init
 
@@ -27,73 +28,60 @@ def monitor_table(request):
     result = {'status': 'success', 'msg': '', 'data': []}
     latest_data = None
     try:
-        with open("./static/media/link.json", 'r', encoding='UTF-16')as f:
+        with open("./static/media/link.json", 'r', encoding='UTF-16') as f:
             param = json.load(f)
-            connection = pymysql.connect(host=param['db']['host'], port=param['db']['port'], user=param['db']
-                            ['user'], passwd=param['db']['passwd'], db=param['db']['db'], charset='gbk')
+            connection = pymysql.connect(
+                host=param['db']['host'], 
+                port=param['db']['port'], 
+                user=param['db']['user'], 
+                passwd=param['db']['passwd'], 
+                db=param['db']['db'], 
+                charset='gbk'
+            )
         cursor = connection.cursor(pymysql.cursors.DictCursor)
-        # SQL 查询该时间点的所有降雨数据
+
+        # ✅ 修正 SQL，確保 `station_id` 被抓取
         sql = """
-        SELECT * FROM `rainfall_web`
-        WHERE `data_time` = (SELECT MAX(`data_time`) FROM `rainfall_web`) ORDER BY `rainfall_10min` DESC;
+        SELECT station_id, station_name, region_name, rainfall_10min, rainfall_1hr, 
+               rainfall_3hr, rainfall_6hr, rainfall_12hr, rainfall_24hr, rainfall_2days, 
+               data_time, current_time
+        FROM `rainfall_web`
+        WHERE `data_time` = (SELECT MAX(`data_time`) FROM `rainfall_web`) 
+        ORDER BY `rainfall_10min` DESC;
         """
         
         cursor.execute(sql)
-        latest_data = cursor.fetchall()  # 获取该时间点的所有数据
+        latest_data = cursor.fetchall()  # 獲取該時間點的所有資料
 
         if latest_data:
             result['data'] = latest_data
+            data_time = latest_data[0]['data_time'].strftime('%Y-%m-%d %H:%M:%S')
             result['msg'] = f'成功取得最近 {data_time} 的降雨資料'
             print(result['msg'])
         else:
             result['msg'] = '沒有符合條件的降雨資料'
             print(result['msg'])
+            data_time = None
 
     except Exception as e:
         result['status'] = 'error'
-        error_class = e.__class__.__name__  # 获取错误类型
-        detail = e.args[0]  # 获取详细内容
-        cl, exc, tb = sys.exc_info()  # 获取Call Stack
-        lastCallStack = traceback.extract_tb(tb)[-1]  # 获取Call Stack的最后一条数据
-        fileName = lastCallStack.filename  # 获取发生的文件名称
-        lineNum = lastCallStack.lineno  # 获取发生的行号
-        funcName = lastCallStack.name  # 获取发生的函数名称
+        error_class = e.__class__.__name__
+        detail = e.args[0]
+        cl, exc, tb = sys.exc_info()
+        lastCallStack = traceback.extract_tb(tb)[-1]
+        fileName = lastCallStack.filename
+        lineNum = lastCallStack.lineno
+        funcName = lastCallStack.name
         errMsg = f"File \"{fileName}\", line {lineNum}, in {funcName}: [{error_class}] {detail}"
         result['msg'] = errMsg
+        data_time = None
 
-    
-
-    # 传递数据时间到模板
-    data_time = latest_data[0]['data_time'].strftime('%Y-%m-%d %H:%M:%S') if latest_data else None
-
-    file_path_station = os.path.join(settings.BASE_DIR, 'static/media', 'stations.txt')
-    
-    # Read the stations from the file
-    if os.path.exists(file_path_station):
-        with open(file_path_station, 'r') as file:
-            stations_to_check = file.read().strip('[]').replace('"', '').split(',')
-    stations_string = ', '.join([station.strip() for station in stations_to_check])
-
-     # Read the rainfall condition from the file
-    file_path_condition = os.path.join(settings.BASE_DIR, 'static/media', 'condition.txt')
-    if os.path.exists(file_path_condition):
-        with open(file_path_condition, 'r') as file:
-             rainfall = file.read()
-    
-    # read record_station frme the file
-    file_path_record = os.path.join(settings.BASE_DIR, 'static/media', 'record_notified_station.txt')
-    if os.path.exists(file_path_record):
-        with open(file_path_record, 'r') as file:
-             record = file.read()
-           
 
     context = {
-        'rainfall_data': result['data'],
-        'data_time': data_time,
-        'stations_string': stations_string,
-        'rainfall':rainfall,
-        'record':record,
+        'rainfall_data': result['data'],  # ✅ 確保 `station_id` 會傳遞到前端
+        'data_time': data_time
     }
+
     response = render(request, 'monitor_table.html', context)
     response['Strict-Transport-Security'] = 'max-age=2592000'
     response['X-Frame-Options'] = 'SAMEORIGIN'
@@ -104,27 +92,52 @@ def monitor_table(request):
     
     return response
 
-
 # 選擇觀測測站
+@csrf_protect
 def select_station(request):
-    file_path = os.path.join(settings.BASE_DIR, 'static/media', 'stations.txt')
-    
-    # Initialize the station list
-    stations_list = []
-    
-    # Read the stations from the file
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            content = file.read().strip()
-            stations_list = [station.strip().strip('[]').strip('"').strip("'") for station in content.split(',')]
-    
-    stations_list = [station for station in stations_list]
+    detect_list = []
+    station_list = []
 
-    context = {'stations_to_check': stations_list}
+    with open("./static/media/link.json", 'r', encoding='UTF-16') as f:
+        param = json.load(f)
+        connection = pymysql.connect(
+            host=param['db']['host'], 
+            port=param['db']['port'], 
+            user=param['db']['user'], 
+            passwd=param['db']['passwd'], 
+            db=param['db']['db'], 
+            charset='gbk'
+        )
+    cursor = connection.cursor(pymysql.cursors.DictCursor)
+
+    # SQL 查詢從 detect_condition 表中獲取 station_id
+    query = "SELECT station_id, station_name, rainfall_num FROM detect_condition"
+
+    query_station = """
+        SELECT * FROM `rainfall_web`
+        WHERE `data_time` = (SELECT MAX(`data_time`) FROM `rainfall_web`) 
+        ORDER BY `rainfall_10min` DESC;
+    """
     
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    cursor.execute(query_station)
+    station_list = cursor.fetchall()
+
+    # 轉換為字典列表，確保 station_id 不為 None
+    detect_list = [
+        {
+            "station_id": row["station_id"] if row["station_id"] else "UNKNOWN_ID",
+            "station_name": row["station_name"], 
+            "rainfall_num": row["rainfall_num"] if row["rainfall_num"] else "0"
+        }
+        for row in rows
+    ]
+
+    context = {'detect_list': detect_list, 'station_list': station_list}
     response = render(request, 'select_station.html', context)
-    
-    # Security headers
+    # 設定安全性標頭
     response['Strict-Transport-Security'] = 'max-age=2592000'
     response['X-Frame-Options'] = 'SAMEORIGIN'
     response['Referrer-Policy'] = 'no-referrer'
@@ -138,61 +151,49 @@ def select_station(request):
 @csrf_exempt
 def save_selected_stations(request):
     if request.method == 'POST':
-        # 获取传入的测站列表
-        selected_stations = request.POST.get('selected_stations', '')
-        # 将测站列表分割成数组
-        stations_list = selected_stations.split(',')
-        # 创建一个字符串，包含所有测站
-        txt_content = ",".join(stations_list)
-        # 使用相对路径保存文件，路径相对于 Django 项目的根目录
-        file_dir = os.path.join(settings.BASE_DIR, 'static/media')
-        file_name = 'stations.txt'
-        file_path = os.path.join(file_dir, file_name)
-        # 将内容写入文件
-        with open(file_path, 'w') as file:
-            file.write(txt_content)
-        # 返回一个简单的响应确认保存成功
-        return HttpResponse(f"File saved successfully at: {file_path}")
+        try:
+            data = json.loads(request.body)
+            selected_stations = data.get('selected_stations', [])
 
+            if not selected_stations:
+                return JsonResponse({"error": "未收到測站資料"}, status=400)
 
-# 變更雨量條件
-@csrf_protect
-def notify_condition(request):
-    file_path = os.path.join(settings.BASE_DIR, 'static/media', 'condition.txt')
-    # Read the stations from the file
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            content = file.read()
-           
-    context = {'rainfall': content}
-    
-    response = render(request, 'notify_condition.html', context)
-    response['Strict-Transport-Security'] = 'max-age=2592000'
-    response['X-Frame-Options'] = 'SAMEORIGIN'
-    response['Referrer-Policy'] = 'no-referrer'
-    response['X-XSS-Protection'] = '1; mode=block'
-    response['X-Content-Type-Options'] = 'nosniff'
-    response['Strict-Transport-Security'] = 'max-age=16070400; includeSubDomains'
-    return response
+            with open("./static/media/link.json", 'r', encoding='UTF-16') as f:
+                param = json.load(f)
 
+            connection = pymysql.connect(
+                host=param['db']['host'],
+                port=param['db']['port'],
+                user=param['db']['user'],
+                passwd=param['db']['passwd'],
+                db=param['db']['db'],
+                charset='gbk'
+            )
+            cursor = connection.cursor()
 
-#儲存雨量條件
-@csrf_exempt
-def save_rainfall_condition(request):
-    if request.method == 'POST':
-        condition = request.POST.get('rainfall_condition')
+            cursor.execute("DELETE FROM detect_condition")
 
-        # 使用相对路径保存文件，路径相对于 Django 项目的根目录
-        file_dir = os.path.join(settings.BASE_DIR, 'static/media')
-        file_name = 'condition.txt'
-        file_path = os.path.join(file_dir, file_name)
+            for station in selected_stations:
+                station_id = station.get("station_id", "UNKNOWN_ID")
+                station_name = station.get("station_name", "未知測站")
+                rainfall_num = station.get("rainfall_num", "0")
 
-        # 将内容写入文件
-        with open(file_path, 'w') as file:
-            file.write(condition)
-        # 返回一个简单的响应确认保存成功
-        return HttpResponse(f"File saved successfully at: {file_path}")
-    
+                sql = """
+                    INSERT INTO detect_condition (station_id, station_name, rainfall_num) 
+                    VALUES (%s, %s, %s)
+                """
+                cursor.execute(sql, (station_id, station_name, rainfall_num))
+
+            connection.commit()
+            cursor.close()
+            connection.close()
+
+            return JsonResponse({"message": "測站已成功儲存至資料庫！"}, status=200)
+
+        except Exception as e:
+            print("發生錯誤：", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
 # 10/23 upgrade    
 # 閥門資料表
 @csrf_protect
@@ -201,14 +202,10 @@ def valve_table(request):
     latest_data = None
     try:
         # 連接資料庫
-        
-        connection = connection = pymysql.connect(
-                host='mysql_service',
-                user='num7',
-                password='1qaz2wsx',
-                database='water_monitor',
-                charset='utf8mb4',
-                )
+        with open("./static/media/link.json", 'r', encoding='UTF-16')as f:
+                param = json.load(f)
+                connection = pymysql.connect(host=param['db']['host'], port=param['db']['port'], user=param['db']
+                                         ['user'], passwd=param['db']['passwd'], db=param['db']['db'], charset='gbk')
         cursor = connection.cursor(pymysql.cursors.DictCursor)
         
         # 查詢最新的資料
@@ -305,13 +302,10 @@ def monitor_sheet_insert(request):
         sheet_data['current_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 添加 current_time
         try:
             # 建立資料庫連接
-            connection = connection = pymysql.connect(
-                host='mysql_service',
-                user='num7',
-                password='1qaz2wsx',
-                database='water_monitor',
-                charset='utf8mb4',
-                )
+            with open("./static/media/link.json", 'r', encoding='UTF-16')as f:
+                param = json.load(f)
+                connection = pymysql.connect(host=param['db']['host'], port=param['db']['port'], user=param['db']
+                                         ['user'], passwd=param['db']['passwd'], db=param['db']['db'], charset='gbk')
             cursor = connection.cursor(pymysql.cursors.DictCursor)
             # 建立 SQL 語句
             sql = f"INSERT INTO `valve_table` ({', '.join([f'`{field}`' for field in fields])}) VALUES ({', '.join(['%s'] * len(fields))});"
@@ -349,13 +343,10 @@ def delete_valve_record(request):
             # 從 POST 請求中獲取資料 ID
             record_id = request.POST.get('id')
             # 連接資料庫
-            connection = connection = pymysql.connect(
-                host='mysql_service',
-                user='num7',
-                password='1qaz2wsx',
-                database='water_monitor',
-                charset='utf8mb4',
-                )
+            with open("./static/media/link.json", 'r', encoding='UTF-16')as f:
+                param = json.load(f)
+                connection = pymysql.connect(host=param['db']['host'], port=param['db']['port'], user=param['db']
+                                         ['user'], passwd=param['db']['passwd'], db=param['db']['db'], charset='gbk')
             cursor = connection.cursor(pymysql.cursors.DictCursor)
 
             # 刪除指定的記錄
@@ -385,8 +376,5 @@ def delete_valve_record(request):
     return JsonResponse(result)
 
 
-
-
-	
 
 
