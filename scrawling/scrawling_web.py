@@ -4,6 +4,8 @@ import pandas as pd
 from datetime import datetime
 import pymysql
 import requests
+import smtplib
+from email.mime.text import MIMEText
 
 
 # =========================
@@ -101,6 +103,33 @@ def line_notify_if_needed(stations_to_check, df, connection):
     # ✅ 不發送工程通知，只記錄 log
 
 # =========================
+# 發送mail通知
+# =========================
+def send_email(content: str, recipients: list, subject: str):
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+    sender_email = "no7notification@gmail.com"
+    password = "esvs wrdd eamh uuit"
+
+    message = MIMEText(content, "plain", "utf-8")
+    message["From"] = sender_email
+    message["To"] = ", ".join(recipients)
+    message["Subject"] = subject
+
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.ehlo()             
+        server.starttls()         
+        server.login(sender_email, password)
+
+        server.sendmail(sender_email, recipients, message.as_string())
+        print("郵件發送成功!")
+    except Exception as e:
+        print("郵件發送失敗:", e)
+    finally:
+        server.quit()
+
+# =========================
 # 插入通知記錄至 log_table
 # =========================
 def insert_notify_logs_bulk(connection, notify_log_entries):
@@ -126,6 +155,7 @@ def send_success_notification(token, messages):
 2. 當雨天（梅雨、颱風、豪大雨）進流水量高於 300m³/hr 以上時，將逐步調整閘門開度，以確保設備運轉正常。\n\
 3. 必要時，得關閉進流閘門，以保護進流抽水站設備。"
     line_message_api(token, channel_ID, detailed_message)
+    send_email(detailed_message,["haozengtw@gmail.com","kenny.chen@ulpu.com.tw","wrcchi.hung@ulpu.com.tw","lt.huang@ulpu.com.tw"],"上水雨量通知")
     print("達標通知已發送")
 
 # =========================

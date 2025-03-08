@@ -20,8 +20,5 @@ RUN pip install -r requirements.txt
 # 复制整个项目到容器
 COPY . /app/
 
-# 挂载共享的 static 文件夹
-VOLUME /app/static
-
 # 启动 Scrawling 脚本
 CMD ["python", "scrawling_web.py"]

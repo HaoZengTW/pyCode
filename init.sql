@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS `log_table` (
 
 CREATE TABLE IF NOT EXISTS `rainfall_web` (
   `primary_num` int NOT NULL AUTO_INCREMENT,
+  `station_id` varchar(45) DEFAULT NULL,
   `station_name` varchar(45) DEFAULT NULL,
   `region_name` varchar(45) DEFAULT NULL,
   `rainfall_10min` float DEFAULT NULL,
@@ -40,3 +41,10 @@ CREATE TABLE IF NOT EXISTS `valve_table` (
   PRIMARY KEY (`valve_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `detect_condition` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `station_id` varchar(45) DEFAULT NULL ,
+  `station_name` varchar(45) DEFAULT NULL,
+  `rainfall_num` float DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
